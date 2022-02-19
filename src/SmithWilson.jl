@@ -91,13 +91,13 @@ Positional arguments to construct a curve:
 
 Required keyword arguments:
 
-- `ufr` is the Ultimate Forward Rate, the forward interest rate to which the yield curve tends, in continuous compounding convention. 
+- `ufr` is the Ultimate Forward Rate, the forward interest rate to which the yield curve tends. It must be a `Rate`.
 - `α` is the parameter that governs the speed of convergence towards the Ultimate Forward Rate. It can be typed with `\\alpha[TAB]`
 """
 struct SmithWilson{TU<:AbstractVector,TQb<:AbstractVector} <: AbstractYield
     u::TU
     qb::TQb
-    ufr
+    ufr::Rate
     α
 
     # Inner constructor ensures that vector lengths match
@@ -109,7 +109,7 @@ struct SmithWilson{TU<:AbstractVector,TQb<:AbstractVector} <: AbstractYield
     end
 end
 
-SmithWilson(u::TU, qb::TQb; ufr, α) where {TU<:AbstractVector,TQb<:AbstractVector} = SmithWilson{TU,TQb}(u, qb; ufr = ufr, α = α)
+SmithWilson(u::TU, qb::TQb; ufr::Rate, α) where {TU<:AbstractVector,TQb<:AbstractVector,TUfr} = SmithWilson{TU,TQb}(u, qb; ufr = ufr, α = α)
 
 """
     H_ordered(α, t_min, t_max)
@@ -137,12 +137,12 @@ H(α, t1vec::AbstractVector, t2vec::AbstractVector) = [H(α, t1, t2) for t1 in t
 H(α, tvec::AbstractVector) = H(α, tvec, tvec)
 
 
-discount(sw::SmithWilson, t) = exp(-sw.ufr * t) * (1.0 + H(sw.α, sw.u, t) ⋅ sw.qb)
-Base.zero(sw::SmithWilson, t) = Continuous(sw.ufr - log(1.0 + H(sw.α, sw.u, t) ⋅ sw.qb) / t)
+discount(sw::SmithWilson, t) = discount(sw.ufr, t) * (1.0 + H(sw.α, sw.u, t) ⋅ sw.qb)
+Base.zero(sw::SmithWilson, t) = Continuous(-log(discount(sw, t)) / t)
 Base.zero(sw::SmithWilson, t, cf::CompoundingFrequency) = convert(cf, zero(sw, t))
 
 function SmithWilson(times::AbstractVector, cashflows::AbstractMatrix, prices::AbstractVector; ufr, α)
-    Q = Diagonal(exp.(-ufr * times)) * cashflows
+    Q = Diagonal(discount.(ufr, times)) * cashflows
     q = vec(sum(Q, dims = 1))  # We want q to be a column vector
     QHQ = Q' * H(α, times) * Q
     b = QHQ \ (prices - q)

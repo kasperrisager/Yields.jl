@@ -33,7 +33,7 @@
 
     @testset "SmithWilson" begin
 
-        ufr = 0.03
+        ufr = Continuous(0.03)
         α = 0.1
         u = [5.0, 7.0]
         qb = [2.3, -1.2]
@@ -50,22 +50,22 @@
         # Use this to test methods expected from <:AbstractYieldCurve
         # Only discount and zero are explicitly implemented, so the others should follow automatically
         sw_flat = Yields.SmithWilson(Float64[], Float64[], ufr = ufr, α = α)
-        @test discount(sw_flat, 10.0) == exp(-ufr * 10.0)
-        @test accumulation(sw_flat, 10.0) ≈ exp(ufr * 10.0)
-        @test rate(convert(Yields.Continuous(), zero(sw_flat, 8.0))) ≈ ufr
-        @test discount.(sw_flat, [5.0, 10.0]) ≈ exp.(-ufr .* [5.0, 10.0])
-        @test rate(convert(Yields.Continuous(), forward(sw_flat, 5.0, 8.0))) ≈ ufr
+        @test discount(sw_flat, 10.0) == discount(ufr, 10.0)
+        @test accumulation(sw_flat, 10.0) ≈ accumulation(ufr, 10.0)
+        @test zero(sw_flat, 8.0) ≈ ufr
+        @test discount.(sw_flat, [5.0, 10.0]) ≈ discount.(ufr, [5.0, 10.0])
+        @test forward(sw_flat, 5.0, 8.0) ≈ ufr
 
         # A trivial Qb vector (=0) should result in a flat yield curve
         ufr_curve = Yields.SmithWilson(u, [0.0, 0.0], ufr = ufr, α = α)
-        @test discount(ufr_curve, 10.0) == exp(-ufr * 10.0)
+        @test discount(ufr_curve, 10.0) == discount(ufr, 10.0)
 
         # A single payment at time 4, zero interest
         curve_with_zero_yield = Yields.SmithWilson([4.0], reshape([1.0], 1, 1), [1.0], ufr = ufr, α = α)
         @test discount(curve_with_zero_yield, 4.0) == 1.0
 
         # In the long end it's still just UFR
-        @test rate(convert(Yields.Continuous(), forward(curve_with_zero_yield, 1000.0, 2000.0))) ≈ ufr
+        @test forward(curve_with_zero_yield, 1000.0, 2000.0) ≈ ufr
 
         # Three maturities have known discount factors
         times = [1.0, 2.5, 5.6]
@@ -166,7 +166,7 @@
             0.00302383083427276
             1.36047951448615000]
         eiopa_output_u = 1:20
-        eiopa_ufr = log(1.036)
+        eiopa_ufr = Periodic(0.036, 1)
         eiopa_α = 0.133394
         sw_eiopa_expected = Yields.SmithWilson(eiopa_output_u, eiopa_output_qb; ufr = eiopa_ufr, α = eiopa_α)
 
